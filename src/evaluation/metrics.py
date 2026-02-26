@@ -305,7 +305,7 @@ def print_hmm_season_report(season_stats: pd.DataFrame,
     print(f"\n  Detected {len(season_stats)} seasons:")
     for _, row in season_stats.iterrows():
         print(f"    Season {int(row['season_label'])}: "
-              f"{row['onset_date'].strftime('%Y-%m-%d')} → "
+              f"{row['onset_date'].strftime('%Y-%m-%d')} -> "
               f"{row['end_date'].strftime('%Y-%m-%d')}  "
               f"({int(row['duration_weeks'])} wks, "
               f"peak={row['peak_ili']:,.0f})")

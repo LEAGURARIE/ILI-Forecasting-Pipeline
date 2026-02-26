@@ -231,15 +231,18 @@ def plot_hmm_seasonality(weekly_df: pd.DataFrame, save_path: str = None):
         end = s["week_start_date"].iloc[-1]
         axes[0].axvspan(start, end, alpha=0.2, color="tomato")
 
-        # Annotate season label above peak
+        # Annotate season label with week range above peak
         peak_idx = s["ILI_CASE"].idxmax()
         peak_date = s.loc[peak_idx, "week_start_date"]
         peak_val = s.loc[peak_idx, "ILI_CASE"]
+        onset_week = start.isocalendar()[1]
+        end_week = end.isocalendar()[1]
+        peak_week = peak_date.isocalendar()[1]
         axes[0].annotate(
-            f"{int(season)}",
+            f"{int(season)}\nW{onset_week}-W{end_week}\npeak W{peak_week}",
             xy=(peak_date, peak_val),
-            xytext=(0, 12), textcoords="offset points",
-            ha="center", fontsize=8, fontweight="bold", color="tomato",
+            xytext=(0, 18), textcoords="offset points",
+            ha="center", fontsize=7, fontweight="bold", color="tomato",
         )
 
     axes[0].set_ylabel("ILI Cases")
@@ -252,10 +255,17 @@ def plot_hmm_seasonality(weekly_df: pd.DataFrame, save_path: str = None):
     axes[1].axhline(0.5, color="gray", linestyle="--", linewidth=1, label="Threshold (0.5)")
     axes[1].fill_between(dates, weekly_df["season_prob"], alpha=0.15, color="tomato")
     axes[1].set_ylabel("Season Prob.")
-    axes[1].set_xlabel("Date")
+    axes[1].set_xlabel("Date (week number shown)")
     axes[1].set_ylim(0, 1.05)
     axes[1].legend(loc="upper left")
     axes[1].grid(alpha=0.3)
+
+    # Add week numbers to x-axis tick labels
+    import matplotlib.dates as mdates
+    axes[1].xaxis.set_major_locator(mdates.MonthLocator(interval=6))
+    axes[1].xaxis.set_major_formatter(
+        mdates.DateFormatter("%b %Y\n(W%V)")
+    )
 
     plt.tight_layout()
     _save_or_show(fig, save_path)
