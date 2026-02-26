@@ -5,12 +5,24 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from pathlib import Path
+from statsmodels.graphics.tsaplots import plot_acf, plot_pacf
+
+
+def _save_or_show(fig, save_path: str = None):
+    """Save figure and close, or show interactively."""
+    if save_path:
+        Path(save_path).parent.mkdir(parents=True, exist_ok=True)
+        fig.savefig(save_path, dpi=150, bbox_inches="tight")
+        plt.close(fig)
+    else:
+        plt.show()
 
 
 def plot_forecast(train: pd.DataFrame, test: pd.DataFrame,
                   forecast: np.ndarray, model_name: str = "SARIMAX",
+                  ci_lower: np.ndarray = None, ci_upper: np.ndarray = None,
                   save_path: str = None):
-    """Plot forecast vs actual with train context."""
+    """Plot forecast vs actual with train context and 95% CI."""
     actual = np.expm1(test["log_ILI"]).values
 
     fig, axes = plt.subplots(2, 1, figsize=(16, 10))
@@ -27,27 +39,30 @@ def plot_forecast(train: pd.DataFrame, test: pd.DataFrame,
     axes[0].legend()
     axes[0].grid(alpha=0.3)
 
-    # Test zoom
+    # Test zoom with CI
     axes[1].plot(test["week_start_date"], actual,
                  color="black", linewidth=2, marker="o", markersize=3, label="Actual")
     axes[1].plot(test["week_start_date"], forecast,
                  color="tomato", linewidth=2, linestyle="--", marker="s",
                  markersize=3, label="Forecast")
-    axes[1].fill_between(test["week_start_date"],
-                          forecast * 0.8, forecast * 1.2,
-                          alpha=0.15, color="tomato", label="±20% band")
+
+    if ci_lower is not None and ci_upper is not None:
+        axes[1].fill_between(test["week_start_date"],
+                              ci_lower, ci_upper,
+                              alpha=0.15, color="tomato", label="95% CI")
+    else:
+        # Fallback to ±20% band if no CI provided
+        axes[1].fill_between(test["week_start_date"],
+                              forecast * 0.8, forecast * 1.2,
+                              alpha=0.15, color="tomato", label="±20% band")
+
     axes[1].set_title("Test Period", fontsize=14, fontweight="bold")
     axes[1].set_ylabel("ILI Cases")
     axes[1].legend()
     axes[1].grid(alpha=0.3)
 
     plt.tight_layout()
-
-    if save_path:
-        Path(save_path).parent.mkdir(parents=True, exist_ok=True)
-        plt.savefig(save_path, dpi=150, bbox_inches="tight")
-
-    plt.show()
+    _save_or_show(fig, save_path)
 
 
 def plot_actual_vs_predicted(actual: np.ndarray, predicted: np.ndarray,
@@ -65,9 +80,7 @@ def plot_actual_vs_predicted(actual: np.ndarray, predicted: np.ndarray,
     ax.grid(alpha=0.3)
 
     plt.tight_layout()
-    if save_path:
-        plt.savefig(save_path, dpi=150, bbox_inches="tight")
-    plt.show()
+    _save_or_show(fig, save_path)
 
 
 def plot_baselines_comparison(test: pd.DataFrame, models: dict,
@@ -102,9 +115,56 @@ def plot_baselines_comparison(test: pd.DataFrame, models: dict,
     ax.grid(alpha=0.3)
 
     plt.tight_layout()
-    if save_path:
-        plt.savefig(save_path, dpi=150, bbox_inches="tight")
-    plt.show()
+    _save_or_show(fig, save_path)
+
+
+def plot_residual_diagnostics(actual: np.ndarray, predicted: np.ndarray,
+                               dates: pd.Series = None,
+                               model_name: str = "SARIMAX",
+                               save_path: str = None):
+    """
+    Residual diagnostic plots: residuals over time, histogram, ACF, PACF.
+
+    Parameters
+    ----------
+    actual : np.ndarray
+    predicted : np.ndarray
+    dates : pd.Series (optional)
+        Date index for the x-axis
+    model_name : str
+    save_path : str (optional)
+    """
+    residuals = actual - predicted
+
+    fig, axes = plt.subplots(2, 2, figsize=(16, 10))
+
+    # 1. Residuals over time
+    x = dates if dates is not None else np.arange(len(residuals))
+    axes[0, 0].plot(x, residuals, color="steelblue", linewidth=0.8)
+    axes[0, 0].axhline(0, color="red", linestyle="--", linewidth=1)
+    axes[0, 0].set_title("Residuals Over Time", fontweight="bold")
+    axes[0, 0].set_ylabel("Residual (Actual - Predicted)")
+    axes[0, 0].grid(alpha=0.3)
+
+    # 2. Histogram of residuals
+    axes[0, 1].hist(residuals, bins=30, edgecolor="black", alpha=0.7, color="steelblue")
+    axes[0, 1].axvline(0, color="red", linestyle="--", linewidth=1)
+    axes[0, 1].set_title("Residual Distribution", fontweight="bold")
+    axes[0, 1].set_xlabel("Residual")
+    axes[0, 1].set_ylabel("Frequency")
+
+    # 3. ACF of residuals
+    plot_acf(residuals, lags=40, ax=axes[1, 0], alpha=0.05)
+    axes[1, 0].set_title("ACF of Residuals", fontweight="bold")
+
+    # 4. PACF of residuals
+    plot_pacf(residuals, lags=40, ax=axes[1, 1], alpha=0.05, method="ywm")
+    axes[1, 1].set_title("PACF of Residuals", fontweight="bold")
+
+    fig.suptitle(f"{model_name} — Residual Diagnostics",
+                 fontsize=15, fontweight="bold", y=1.01)
+    plt.tight_layout()
+    _save_or_show(fig, save_path)
 
 
 def plot_season_panels(weekly_df: pd.DataFrame, save_path: str = None):
@@ -140,10 +200,65 @@ def plot_season_panels(weekly_df: pd.DataFrame, save_path: str = None):
     plt.suptitle("ILI vs Temperature per Season",
                  fontsize=15, fontweight="bold", y=1.01)
     plt.tight_layout()
+    _save_or_show(fig, save_path)
 
-    if save_path:
-        plt.savefig(save_path, dpi=150, bbox_inches="tight")
-    plt.show()
+
+def plot_hmm_seasonality(weekly_df: pd.DataFrame, save_path: str = None):
+    """
+    Two-panel figure showing HMM season detection across the full timeline.
+
+    Top panel (3:1 height): ILI time series with season periods shaded
+    Bottom panel: Season probability over time with 0.5 threshold
+    """
+    fig, axes = plt.subplots(
+        2, 1, figsize=(16, 8),
+        gridspec_kw={"height_ratios": [3, 1]},
+        sharex=True,
+    )
+
+    dates = weekly_df["week_start_date"]
+    ili = weekly_df["ILI_CASE"]
+    is_season = weekly_df["is_season"].values
+
+    # --- Top panel: ILI time series with season shading ---
+    axes[0].plot(dates, ili, color="steelblue", linewidth=0.9, label="ILI Cases")
+
+    # Shade season periods
+    season_data = weekly_df[weekly_df["season_label"].notna()]
+    for season in sorted(season_data["season_label"].unique()):
+        s = season_data[season_data["season_label"] == season]
+        start = s["week_start_date"].iloc[0]
+        end = s["week_start_date"].iloc[-1]
+        axes[0].axvspan(start, end, alpha=0.2, color="tomato")
+
+        # Annotate season label above peak
+        peak_idx = s["ILI_CASE"].idxmax()
+        peak_date = s.loc[peak_idx, "week_start_date"]
+        peak_val = s.loc[peak_idx, "ILI_CASE"]
+        axes[0].annotate(
+            f"{int(season)}",
+            xy=(peak_date, peak_val),
+            xytext=(0, 12), textcoords="offset points",
+            ha="center", fontsize=8, fontweight="bold", color="tomato",
+        )
+
+    axes[0].set_ylabel("ILI Cases")
+    axes[0].set_title("HMM Flu Season Detection", fontsize=14, fontweight="bold")
+    axes[0].legend(loc="upper left")
+    axes[0].grid(alpha=0.3)
+
+    # --- Bottom panel: season probability ---
+    axes[1].plot(dates, weekly_df["season_prob"], color="tomato", linewidth=0.9)
+    axes[1].axhline(0.5, color="gray", linestyle="--", linewidth=1, label="Threshold (0.5)")
+    axes[1].fill_between(dates, weekly_df["season_prob"], alpha=0.15, color="tomato")
+    axes[1].set_ylabel("Season Prob.")
+    axes[1].set_xlabel("Date")
+    axes[1].set_ylim(0, 1.05)
+    axes[1].legend(loc="upper left")
+    axes[1].grid(alpha=0.3)
+
+    plt.tight_layout()
+    _save_or_show(fig, save_path)
 
 
 def plot_next_season(weekly_df: pd.DataFrame, future_df: pd.DataFrame,
@@ -151,7 +266,7 @@ def plot_next_season(weekly_df: pd.DataFrame, future_df: pd.DataFrame,
     """
     Plot next-season forecast in three panels.
 
-    Panel A: Full history + forecast with 95 % CI
+    Panel A: Full history + forecast with 95% CI
     Panel B: Recent 60 weeks zoom + forecast with peak annotation
     Panel C: Predicted season aligned by peak vs last 4 historical seasons
     """
@@ -164,7 +279,6 @@ def plot_next_season(weekly_df: pd.DataFrame, future_df: pd.DataFrame,
     # Compute a sensible y-axis cap from historical peaks + forecast
     hist_peak = weekly_df["ILI_CASE"].max()
     y_cap = max(hist_peak, predicted.max()) * 1.3
-    # Clip CI to the cap so the shading doesn't blow up the plot
     ci_upper_clipped = np.minimum(ci_upper, y_cap)
 
     fig, axes = plt.subplots(3, 1, figsize=(18, 16))
@@ -174,7 +288,7 @@ def plot_next_season(weekly_df: pd.DataFrame, future_df: pd.DataFrame,
                  color="steelblue", linewidth=1, label="Historical")
     axes[0].plot(future_df["week_start_date"], predicted,
                  color="tomato", linewidth=2.5, linestyle="--",
-                 label="Multi-step forecast")
+                 label="Forecast")
     axes[0].fill_between(future_df["week_start_date"], ci_lower, ci_upper_clipped,
                           alpha=0.15, color="tomato", label="95% CI")
     axes[0].axvline(last_date, color="gray", linestyle=":", alpha=0.7,
@@ -195,7 +309,7 @@ def plot_next_season(weekly_df: pd.DataFrame, future_df: pd.DataFrame,
                  label="Actual")
     axes[1].plot(future_df["week_start_date"], predicted,
                  color="tomato", linewidth=2.5, linestyle="--", marker="s",
-                 markersize=4, label="Multi-step forecast")
+                 markersize=4, label="Forecast")
     axes[1].fill_between(future_df["week_start_date"], ci_lower, ci_upper_clipped,
                           alpha=0.12, color="tomato", label="95% CI")
     axes[1].axvline(last_date, color="gray", linestyle=":", alpha=0.7)
@@ -214,7 +328,7 @@ def plot_next_season(weekly_df: pd.DataFrame, future_df: pd.DataFrame,
         arrowprops=dict(arrowstyle="->", color="red"),
     )
 
-    axes[1].set_title("Recent + Multi-Step Forecast",
+    axes[1].set_title("Recent + Forecast",
                        fontsize=15, fontweight="bold")
     axes[1].set_ylabel("ILI Cases")
     axes[1].set_ylim(0, y_cap)
@@ -239,8 +353,7 @@ def plot_next_season(weekly_df: pd.DataFrame, future_df: pd.DataFrame,
     axes[2].plot(pred_week_idx, predicted,
                  color="tomato", linewidth=3, linestyle="--",
                  label="Predicted next season")
-    ci_upper_clipped_aligned = np.minimum(ci_upper, y_cap)
-    axes[2].fill_between(pred_week_idx, ci_lower, ci_upper_clipped_aligned,
+    axes[2].fill_between(pred_week_idx, ci_lower, np.minimum(ci_upper, y_cap),
                           alpha=0.1, color="tomato")
 
     axes[2].set_xlabel("Weeks from Peak")
@@ -253,8 +366,4 @@ def plot_next_season(weekly_df: pd.DataFrame, future_df: pd.DataFrame,
     axes[2].axvline(0, color="gray", linestyle=":", alpha=0.5)
 
     plt.tight_layout()
-
-    if save_path:
-        Path(save_path).parent.mkdir(parents=True, exist_ok=True)
-        plt.savefig(save_path, dpi=150, bbox_inches="tight")
-    plt.show()
+    _save_or_show(fig, save_path)

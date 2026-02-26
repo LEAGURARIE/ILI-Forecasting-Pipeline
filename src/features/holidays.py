@@ -1,8 +1,12 @@
 """
 Israeli holiday processing for Prophet and feature engineering.
 """
+import logging
+
 import pandas as pd
 import holidays as holidays_pkg
+
+logger = logging.getLogger(__name__)
 
 
 def build_holidays_df(
@@ -12,8 +16,6 @@ def build_holidays_df(
     end_date: str
 ) -> pd.DataFrame:
     """
-    Build holidays DataFrame for Prophet.
-
     Combines CSV holidays + python holidays package,
     maps to consolidated groups, keeps first day per group per year.
 
@@ -40,11 +42,19 @@ def build_holidays_df(
     pkg_df["holiday_raw"] = pkg_df["holiday_raw"].str.strip().str.lower()
 
     # Combine and deduplicate
+    combined = pd.concat([csv_df, pkg_df], ignore_index=True).dropna().sort_values("ds")
+    n_before = len(combined)
+    duplicated_dates = combined[combined.duplicated(subset=["ds"], keep="first")]
+    if len(duplicated_dates) > 0:
+        logger.info(
+            f"Dropping {len(duplicated_dates)} duplicate holiday dates "
+            f"(keeping first occurrence). Examples: "
+            f"{duplicated_dates[['ds', 'holiday_raw']].head(3).to_dict('records')}"
+        )
+
     all_holidays = (
-        pd.concat([csv_df, pkg_df], ignore_index=True)
-        .dropna()
+        combined
         .drop_duplicates(subset=["ds"])
-        .sort_values("ds")
         .reset_index(drop=True)
     )
 
@@ -55,6 +65,11 @@ def build_holidays_df(
             raw_to_group[name] = group
 
     all_holidays["holiday"] = all_holidays["holiday_raw"].map(raw_to_group).fillna("other")
+
+    # Log unmapped holidays
+    unmapped = all_holidays[all_holidays["holiday"] == "other"]["holiday_raw"].unique()
+    if len(unmapped) > 0:
+        logger.debug(f"Unmapped holidays (assigned 'other'): {list(unmapped)[:10]}")
 
     # Keep first day per group per year
     all_holidays["year"] = all_holidays["ds"].dt.year
@@ -83,4 +98,5 @@ def build_holidays_df(
         (holidays_combined["ds"] <= end_date)
     ].reset_index(drop=True)
 
+    logger.info(f"Built {len(holidays_combined)} holiday entries")
     return holidays_combined

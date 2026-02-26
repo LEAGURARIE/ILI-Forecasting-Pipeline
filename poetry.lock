@@ -237,6 +237,18 @@ files = [
 ]
 
 [[package]]
+name = "epiweeks"
+version = "2.4.0"
+description = "Epidemiological weeks calculation based on CDC and ISO week numbering systems"
+optional = false
+python-versions = ">=3.10"
+groups = ["main"]
+files = [
+    {file = "epiweeks-2.4.0-py3-none-any.whl", hash = "sha256:a40cdde09b47530e7703d3d75248bb4ae2eb340f23af7c4c50e708b2e733e101"},
+    {file = "epiweeks-2.4.0.tar.gz", hash = "sha256:0096132a50cfc4b52b2bfc8cf841d278740414d01cac303df05146db8b526539"},
+]
+
+[[package]]
 name = "fonttools"
 version = "4.61.1"
 description = "Tools to manipulate font files"
@@ -1714,4 +1726,4 @@ zstd = ["backports-zstd (>=1.0.0) ; python_version < \"3.14\""]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<3.13"
-content-hash = "1922908d5d89b3caa634334b067a5591d6480b8df4ebeeb972d5bfc9029cee1b"
+content-hash = "a9e99eebfe78ae74192f0037a1734c59aa041e86f8dbe685f96fcac12f2b008e"

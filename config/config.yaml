@@ -74,12 +74,11 @@ sarimax:
   order: [3, 1, 0]
   seasonal_order: [1, 0, 1, 52]
   exog_features:
-    # Only truly exogenous regressors — ILI-derived features (delta, pct, rolling)
-    # were removed because they leak the target value at prediction time.
-    # The SARIMAX AR component already captures autoregressive patterns.
     - "tmean_c"
     - "tmean_lag1"
     - "tmean_lag2"
+    - "AUS_ILI_LAG1"
+    - "school_in_session"
   enforce_stationarity: false
   enforce_invertibility: false
   maxiter: 500
