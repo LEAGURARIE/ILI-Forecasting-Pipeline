@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+*.egg
+
+# IDE
+.idea/
+.vscode/
+
+# Generated outputs
+outputs/
+data/processed/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Pytest
+.pytest_cache/
+
+# Poetry
+poetry.lock

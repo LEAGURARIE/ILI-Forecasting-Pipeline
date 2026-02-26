@@ -1,0 +1,96 @@
+# ============================================
+# ILI Forecast — Configuration
+# ============================================
+
+paths:
+  raw_ili: "data/raw/VIW_FID_EPI.csv"
+  raw_holidays: "data/raw/Jewish_Israeli_holidays.csv"
+  raw_temperature: "data/raw/data_202512022119.csv"
+  processed: "data/processed/weekly_df.parquet"
+  models_dir: "outputs/models"
+  figures_dir: "outputs/figures"
+
+data:
+  country: "ISR"
+  start_date: "2011-01-02"
+  end_date: "2025-11-09"
+  freq: "W-SUN"                  # Israeli week starts Sunday
+  southern_hemisphere:
+    countries: ["AUS"]
+    lags: [1]                    # AUS_ILI_LAG1
+
+features:
+  temperature:
+    station: "Tel Aviv coast"
+    lags: [1, 2]                 # tmean_lag1, tmean_lag2
+  school:
+    summer_start_month: 6
+    summer_start_day: 20
+    summer_end_month: 8
+    summer_end_day: 31
+    school_start_month: 9
+    school_start_day: 1
+  holidays:
+    groups:
+      rosh_hashana: ["rosh_hashana", "rosh_hashanah", "rosh hashana", "rosh_hashana_(day_2)", "rosh_hashana_eve"]
+      yom_kippur: ["yom_kippur", "yom_kippur_eve"]
+      sukkot: ["sukkot", "sukkot_eve", "sukkot_(day_1)", "sukkot_(day_2)", "sukkot_(day_3)",
+               "sukkot_(day_4)", "sukkot_(day_5)", "sukkot_(day_6)",
+               "sukkot_(day_7)_/_hoshanah_rabah", "shemini_atzeret_/_simchat_torah",
+               "simchat_torah_/_shemini_atzeret"]
+      hanukkah: ["hanukkah_(day_1)", "hanukkah_(day_2)", "hanukkah_(day_3)", "hanukkah_(day_4)",
+                 "hanukkah_(day_5)", "hanukkah_(day_6)", "hanukkah_(day_7)", "hanukkah_(day_8)",
+                 "hanukkah_(day_6)_/_rosh_chodesh_tevet"]
+      pesach: ["pesach", "passover_eve", "passover_(day_1)", "passover_(day_2)",
+               "passover_(day_3)", "passover_(day_4)", "passover_(day_5)",
+               "passover_(day_6)", "passover_(day_7)", "seventh_day_of_pesach"]
+      purim: ["purim", "fast_of_esther", "shushan_purim_(jerusalem)"]
+      shavuot: ["shavuot", "shavuot_eve"]
+      independence: ["yom_haatzmaut", "independence_day", "independence_day_(observed)"]
+      memorial_days: ["yom_hazikaron", "yom_hashoah", "holocaust_remembrance_day"]
+    long_holidays: ["sukkot", "pesach", "hanukkah"]
+    short_window: 7
+    long_window: 14
+  covid:
+    start: "2020-03-01"
+    end: "2021-06-30"
+
+target:
+  column: "ILI_CASE"
+  transform: "log1p"             # np.log1p
+  inverse: "expm1"               # np.expm1
+
+split:
+  method: "chronological"
+  split_date: "2023-06-01"
+
+hmm:
+  n_components: 2
+  covariance_type: "full"
+  n_iter: 1000
+  random_state: 42
+
+sarimax:
+  order: [3, 1, 0]
+  seasonal_order: [1, 0, 1, 52]
+  exog_features:
+    - "tmean_c"
+    - "tmean_lag1"
+    - "tmean_lag2"
+    - "AUS_ILI_LAG1"
+    - "school_in_session"
+  enforce_stationarity: false
+  enforce_invertibility: false
+  maxiter: 500
+  auto_arima:
+    enabled: false               # set true for hyperparameter search
+    max_p: 4
+    max_q: 2
+    max_P: 1
+    max_Q: 1
+    max_D: 1
+    stepwise: true
+
+evaluation:
+  metrics: ["mae", "rmse", "mape", "r2", "directional_accuracy"]
+  bands: [20, 30, 50]            # ±% tolerance bands
